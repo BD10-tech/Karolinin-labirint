@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomagaj Karolini do zdravila</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+            background-color: #FFF5E6;
+        }
+        h1 {
+            color: #FF69B4;
+            text-align: center;
+            font-size: 8vw;
+            margin-bottom: 10px;
+            margin-top: -10px;
+            text-shadow: 2px 2px 4px #FFB6C1;
+        }
+        #gameCanvas {
+            border: 3px solid #FFA500;
+            border-radius: 10px;
+            width: 80vw;
+            height: 80vw;
+        }
+        #controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+            width: 80vw;
+        }
+        .button {
+            font-size: 6vw;
+            padding: 10px;
+            border: none;
+            background: linear-gradient(145deg, #ff9a9e, #fad0c4);
+            color: #ffffff;
+            cursor: pointer;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        .button:hover {
+            background: linear-gradient(145deg, #fad0c4, #ff9a9e);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        .button:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .button:disabled {
+            background: #D3D3D3;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        #upBtn { grid-column: 2; }
+        #leftBtn { grid-column: 1; grid-row: 2; }
+        #rightBtn { grid-column: 3; grid-row: 2; }
+        #downBtn { grid-column: 2; grid-row: 3; }
+        #info {
+            grid-column: 2;
+            grid-row: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 4vw;
+            color: #FF69B4;
+        }
+        #message {
+            margin-top: 10px;
+            font-size: 5vw;
+            font-weight: bold;
+            text-align: center;
+            width: 90%;
+            color: #FF69B4;
+        }
+        #donateButton {
+            margin-top: 10px;
+            font-size: 4vw;
+            padding: 15px;
+            background-color: #FF69B4;
+            color: white;
+        }
+        #donateButton:hover {
+            background-color: #FF1493 !important;
+        }
+        #organizationName {
+            margin-top: 10px;
+            font-size: 3vw;
+            color: #FF69B4;
+            text-align: center;
+        }
+        .balloon {
+            position: absolute;
+            width: 40px;
+            height: 50px;
+            background-color: #FF69B4;
+            border-radius: 50%;
+            animation: float 4s ease-in infinite;
+            opacity: 0;
+        }
+        
+        .balloon::before {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 15px;
+            background-color: #FF69B4;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-bottom-left-radius: 10px;
+            border-bottom-right-radius: 10px;
+        }
+        
+        @keyframes float {
+            0% {
+                transform: translateY(100vh);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100vh);
+                opacity: 0;
+            }
+        }
+        
+        @keyframes rotate360 {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .rotating {
+            animation: rotate360 0.5s linear;
+        }
+    </style>
+</head>
+<body>
+    <h1>Karolinin dobrodelni labirint</h1>
+    <button id="hiddenStartButton" style="display: none;">Start</button>
+    <canvas id="gameCanvas"></canvas>
+    <div id="controls">
+        <button id="upBtn" class="button">↑</button>
+        <button id="leftBtn" class="button">←</button>
+        <div id="info">Premiki: <span id="moves">0</span></div>
+        <button id="rightBtn" class="button">→</button>
+        <button id="downBtn" class="button">↓</button>
+    </div>
+    <div id="message"></div>
+    <button id="donateButton" class="button">Pošlji SMS donacijo 10€</button>
+    <div id="organizationName">Društvo Viljem Julijan</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    let cellSize;
+    let playerX = 0;
+    let playerY = 0;
+    let moves = 0;
+
+    const maze = [
+        [0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,1,0,1,0,1,1,1,1,1,1,0,1],
+        [1,0,1,0,0,0,1,0,0,0,0,0,0,1,0,1],
+        [1,0,1,0,1,1,1,1,1,1,1,1,0,1,0,1],
+        [1,0,1,0,0,0,0,0,0,0,0,1,0,1,0,1],
+        [1,0,1,1,1,1,1,1,1,1,0,1,0,1,0,1],
+        [1,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1],
+        [1,1,1,1,1,1,1,1,0,1,0,1,0,1,0,1],
+        [1,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1],
+        [1,0,1,1,1,1,1,1,1,1,0,1,0,1,0,1],
+        [1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,1],
+        [1,1,1,1,1,0,1,1,1,1,1,1,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        [1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0]
+    ];
+
+    let backgroundAudio;
+    let winAudio;
+
+    function initializeAudio() {
+        backgroundAudio = new Audio('audio_hero_Show-And-Tell_SIPML_Q-0149.mp3');
+        backgroundAudio.loop = true;
+    }
+
+    function stopBackgroundMusic() {
+        if (backgroundAudio) {
+            backgroundAudio.pause();
+            backgroundAudio.currentTime = 0;
+        }
+    }
+
+    function playWinSound() {
+        winAudio = new Audio('cartoon_success_fanfair.mp3');
+        winAudio.play().catch(error => {
+            console.error("Napaka pri predvajanju zvoka zmage:", error);
+        });
+    }
+
+    function resizeCanvas() {
+        const canvasSize = Math.min(window.innerWidth * 0.8, window.innerHeight * 0.6);
+        canvas.width = canvasSize;
+        canvas.height = canvasSize;
+        cellSize = canvasSize / maze.length;
+        ctx.font = `${cellSize * 0.8}px Arial`;
+        updateGame();
+    }
+
+    function drawMaze() {
+        for (let y = 0; y < maze.length; y++) {
+            for (let x = 0; x < maze[y].length; x++) {
+                if (maze[y][x] === 1) {
+                    ctx.font = `${cellSize}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('🎄', x * cellSize + cellSize / 2, y * cellSize + cellSize / 2);
+                }
+            }
+        }
+    }
+
+    function drawPlayer() {
+        ctx.font = `${cellSize}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('👧', playerX * cellSize + cellSize / 2, playerY * cellSize + cellSize / 2);
+    }
+
+    function drawMedicine() {
+        ctx.fillStyle = 'red';
+        ctx.fillRect(15 * cellSize, 15 * cellSize, cellSize, cellSize);
+        ctx.font = `${cellSize}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('💉', 15.5 * cellSize, 15.5 * cellSize);
+    }
+
+    function updateGame() {
+        ctx.fillStyle = '#90EE90';  // Svetlo zelena
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        drawMaze();
+        drawMedicine();
+        drawPlayer();
+    }
+
+    function movePlayer(dx, dy) {
+        const newX = playerX + dx;
+        const newY = playerY + dy;
+        if (newX >= 0 && newX < maze[0].length && newY >= 0 && newY < maze.length) {
+            if (maze[newY][newX] === 0) {
+                playerX = newX;
+                playerY = newY;
+                moves++;
+                document.getElementById('moves').textContent = moves;
+
+                if (moves === 1 && backgroundAudio && backgroundAudio.paused) {
+                    backgroundAudio.play().catch(error => {
+                        console.error("Napaka pri predvajanju zvoka:", error);
+                    });
+                }
+            } else if (maze[newY][newX] === 1) {
+                rotatePlayer();
+            }
+        }
+        updateGame();
+        checkWin();
+    }
+
+    function rotatePlayer() {
+        const playerEmoji = '👧';
+        const centerX = playerX * cellSize + cellSize / 2;
+        const centerY = playerY * cellSize + cellSize / 2;
+        
+        let angle = 0;
+        const animationDuration = 500; // 500ms
+        const startTime = performance.now();
+        
+        function animate(currentTime) {
+            const elapsedTime = currentTime - startTime;
+            angle = (elapsedTime / animationDuration) * 2 * Math.PI;
+            
+            // Redraw the entire game state
+            ctx.fillStyle = '#90EE90';  // Svetlo zelena
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawMaze();
+            drawMedicine();
+            
+            // Draw rotated player
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(angle);
+            ctx.font = `${cellSize}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(playerEmoji, 0, 0);
+            ctx.restore();
+            
+            if (elapsedTime < animationDuration) {
+                requestAnimationFrame(animate);
+            } else {
+                updateGame(); // Redraw the final game state after animation
+            }
+        }
+        
+        requestAnimationFrame(animate);
+    }
+
+    function createBalloons() {
+        const balloonContainer = document.createElement('div');
+        balloonContainer.style.position = 'fixed';
+        balloonContainer.style.top = '0';
+        balloonContainer.style.left = '0';
+        balloonContainer.style.width = '100%';
+        balloonContainer.style.height = '100%';
+        balloonContainer.style.overflow = 'hidden';
+        balloonContainer.style.pointerEvents = 'none';
+        balloonContainer.style.zIndex = '1000';
+        document.body.appendChild(balloonContainer);
+
+        for (let i = 0; i < 20; i++) {
+            const balloon = document.createElement('div');
+            balloon.className = 'balloon';
+            balloon.style.left = `${Math.random() * 100}%`;
+            balloon.style.animationDuration = `${4 + Math.random() * 2}s`;
+            balloon.style.animationDelay = `${Math.random() * 2}s`;
+            balloon.style.backgroundColor = getRandomColor();
+            balloonContainer.appendChild(balloon);
+        }
+    }
+
+    function getRandomColor() {
+        const colors = ['#FF69B4', '#FFB6C1', '#FFC0CB', '#FF1493', '#DB7093'];
+        return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    function checkWin() {
+        if (playerX === 15 && playerY === 15) {
+            document.getElementById('message').textContent = 'Čestitamo! Dosegli ste zdravilo v ' + moves + ' premikih!';
+            disableControls();
+            stopBackgroundMusic();
+            playWinSound();
+            createBalloons();
+        }
+    }
+
+    function disableControls() {
+        document.getElementById('upBtn').disabled = true;
+        document.getElementById('downBtn').disabled = true;
+document.getElementById('leftBtn').disabled = true;
+        document.getElementById('rightBtn').disabled = true;
+    }
+
+    function startGame() {
+        initializeAudio();
+        resizeCanvas();
+    }
+
+    document.getElementById('hiddenStartButton').addEventListener('click', startGame);
+
+    document.getElementById('upBtn').addEventListener('click', () => movePlayer(0, -1));
+    document.getElementById('downBtn').addEventListener('click', () => movePlayer(0, 1));
+    document.getElementById('leftBtn').addEventListener('click', () => movePlayer(-1, 0));
+    document.getElementById('rightBtn').addEventListener('click', () => movePlayer(1, 0));
+
+    document.getElementById('donateButton').addEventListener('click', function() {
+        const donateButton = document.getElementById('donateButton');
+        const originalText = donateButton.textContent;
+        donateButton.textContent = 'HVALA ZA VAŠO POMOČ';
+        donateButton.disabled = true;
+        
+        setTimeout(() => {
+            donateButton.textContent = originalText;
+            donateButton.disabled = false;
+            window.location.href = 'https://www.t2ll.com/smsRedirect.aspx/?phoneNumber=1919&msg=KAROLINA10';
+        }, 2000);
+    });
+
+    document.addEventListener('keydown', (event) => {
+        switch(event.key) {
+            case 'ArrowUp': movePlayer(0, -1); break;
+            case 'ArrowDown': movePlayer(0, 1); break;
+            case 'ArrowLeft': movePlayer(-1, 0); break;
+            case 'ArrowRight': movePlayer(1, 0); break;
+        }
+    });
+
+    window.addEventListener('resize', resizeCanvas);
+
+    window.addEventListener('load', () => {
+        startGame();
+    });
+</script>
+</body>
+</html>
